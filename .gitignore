@@ -1,0 +1,13 @@
+# Local tooling and generated artifacts; source inputs remain tracked.
+.DS_Store
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+*.log
+vendor/
+node_modules/
+dist/
+coverage/
+.phpunit.result.cache

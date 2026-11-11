@@ -1,0 +1,7 @@
+# Agent entrypoint — GF Native Crop & Rotate
+
+- **Authority:** Owner-approved [G-001–G-012 product goals](https://docs.google.com/document/d/11JLV8w9CjWFiL_jQ3Xn2qJr_2k73lUubYx9lLxFXyNI/edit). Read the relevant goal before implementing behavior. `README.md` describes this repository's actual state and verification.
+- **Now:** foundation only. No functional crop/rotate, Gravity Forms hooks, native file handoff or Entry integration is implemented. Never infer product readiness from PHP lint, a smoke check or a ZIP.
+- **Boundaries:** independent WordPress plugin; genuine native GF Single File Upload only; opt-in/validation-first; mandatory confirmation; no alternate uploader, Entry/storage ownership, silent Multi-File conversion or same-field GP File Upload Pro control. No production/site data or proprietary vendor distributions.
+- **Verification:** from repository root run `sh scripts/verify.sh` (PHP 8.2+, zip/unzip and standard CLI tools). `sh scripts/package.sh` builds a *development-only, nonfunctional* ZIP. The package allowlist must be reviewed when implementation files are introduced. See README for the authentic WordPress/GF evidence still required.
+- **Changes:** do not add guessed Gravity Forms hooks or vendor-specific properties; verify against the actual supported dependency and real lifecycle. Never merge, deploy, release, tag or alter GitHub security settings without Owner authorization.
