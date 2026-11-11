@@ -46,6 +46,25 @@ $page_id = wp_insert_post( array(
 if ( is_wp_error( $page_id ) || ! is_numeric( $page_id ) || $page_id < 1 ) {
     throw new RuntimeException( 'Could not publish local synthetic test page' );
 }
+// Isolated pages for each real GF submission method. All records stay synthetic.
+$legacy_page_id = wp_insert_post( array(
+    'post_type' => 'page',
+    'post_title' => 'GFNCR Synthetic Legacy Iframe',
+    'post_status' => 'publish',
+    'post_content' => sprintf( '[gravityform id="%d" title="false" description="false" ajax="true"]', $form_id ),
+), true );
+$modern_page_id = wp_insert_post( array(
+    'post_type' => 'page',
+    'post_title' => 'GFNCR Synthetic Modern Ajax',
+    'post_status' => 'publish',
+    'post_content' => sprintf( '[gravityform id="%d" title="false" description="false" ajax="false"]', $form_id ),
+), true );
+foreach ( array( $legacy_page_id, $modern_page_id ) as $method_page ) {
+    if ( is_wp_error( $method_page ) || ! is_numeric( $method_page ) || (int) $method_page < 1 ) {
+        throw new RuntimeException( 'Could not create AJAX test page' );
+    }
+}
+update_option( 'gfncr_lab_modern_ajax_page_id', (int) $modern_page_id, false );
 file_put_contents( getenv( 'GFNCR_LAB_DIR' ) . '/fixture.json', wp_json_encode( array(
     'form_id' => (int) $form_id,
     'page_id' => (int) $page_id,
@@ -53,5 +72,7 @@ file_put_contents( getenv( 'GFNCR_LAB_DIR' ) . '/fixture.json', wp_json_encode( 
     'opt_in_persisted' => true,
     'native_single' => true,
     'url_path' => '/?page_id=' . (int) $page_id,
+    'legacy_url_path' => '/?page_id=' . (int) $legacy_page_id,
+    'modern_url_path' => '/?page_id=' . (int) $modern_page_id,
 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 echo 'GF_REAL_FORM_FIXTURE_PASS' . PHP_EOL;

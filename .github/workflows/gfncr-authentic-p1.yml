@@ -105,6 +105,8 @@ jobs:
           for file in tests/authentic-lab/*.php; do php -l "$file"; done
           node --check tests/authentic-lab/browser.cjs
           node --check tests/authentic-lab/assert.cjs
+          node --check tests/authentic-lab/ajax.cjs
+          node --check tests/authentic-lab/ajax-assert.cjs
           python3 -m py_compile tests/authentic-lab/image.py
           printf '{"subject_sha":"%s","source_repo_sha":"%s","vendor_sha256":"%s","plugin_zip_sha256":"%s","source":"existing_GPP_repository","php":"%s"}\n' \
             "$GFNCR_SUBJECT_SHA" "$GFNCR_GPP_SOURCE_SHA" "$GFNCR_GF_SHA" \
@@ -184,6 +186,20 @@ jobs:
           php "$GFNCR_WP_CLI" --path="$GFNCR_WP_DIR" eval-file "$GITHUB_WORKSPACE/tests/authentic-lab/readback.php" --use-include
           node tests/authentic-lab/assert.cjs
           test -s "$GFNCR_LAB_DIR/assertion.json"
+      - name: Exercise actual GF legacy iframe and modern AJAX from edited native input
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node tests/authentic-lab/ajax.cjs
+          test -s "$GFNCR_LAB_DIR/ajax-iframe.json"
+          test -s "$GFNCR_LAB_DIR/ajax-ajax.json"
+      - name: Verify all three saved native Entries and exact edited bytes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php "$GFNCR_WP_CLI" --path="$GFNCR_WP_DIR" eval-file "$GITHUB_WORKSPACE/tests/authentic-lab/ajax-readback.php" --use-include
+          node tests/authentic-lab/ajax-assert.cjs
+          test -s "$GFNCR_LAB_DIR/ajax-assertion.json"
       - name: Upload sanitized evidence only (no vendor package/media)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -200,3 +216,7 @@ jobs:
             /tmp/gfncr-lab-data/browser.json
             /tmp/gfncr-lab-data/readback.json
             /tmp/gfncr-lab-data/assertion.json
+            /tmp/gfncr-lab-data/ajax-iframe.json
+            /tmp/gfncr-lab-data/ajax-ajax.json
+            /tmp/gfncr-lab-data/ajax-readback.json
+            /tmp/gfncr-lab-data/ajax-assertion.json

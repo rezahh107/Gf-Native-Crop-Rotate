@@ -30,3 +30,12 @@ add_action( 'gform_after_submission', function( $entry, $form ) {
         'field_1_nonempty' => ! empty( $entry['1'] ),
     ), JSON_PRETTY_PRINT ) );
 }, 10, 2 );
+
+/** Activate GF's official AJAX submission method only on the dedicated synthetic page. */
+add_filter( 'gform_form_args', function( $args ) {
+    $modern = (int) get_option( 'gfncr_lab_modern_ajax_page_id', 0 );
+    if ( $modern > 0 && (int) get_queried_object_id() === $modern ) {
+        $args['submission_method'] = GFFormDisplay::SUBMISSION_METHOD_AJAX;
+    }
+    return $args;
+}, 20 );
