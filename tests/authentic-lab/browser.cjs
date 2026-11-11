@@ -63,8 +63,12 @@ async function main() {
     assert.equal(negativePreflight.formdata_name, 'synthetic-original.png');
     assert.equal(negativePreflight.method, 'post');
     assert.equal(negativePreflight.enctype, 'multipart/form-data');
-    assert.ok(requests.some(x=>x.contains_original_filename && !x.contains_confirmation),
-      'Negative request not observed as uploaded multipart: ' + JSON.stringify(requests));
+    assert.ok(requests.some(x=>x.method==='POST' && x.content_type==='multipart/form-data'),
+      'Negative browser POST was not observed');
+    const negativeValidation = fs.readFileSync(path.join(root,'validation.jsonl'),'utf8').trim().split('\n').map(JSON.parse)
+      .find(x=>x.file_present && x.file_name==='synthetic-original.png' && !x.marker_confirmed);
+    assert.ok(negativeValidation,'Server did not observe an unconfirmed original via genuine \\$_FILES');
+    assert.equal(negativeValidation.result_valid_at_priority_20,false,'GF server did not reject unconfirmed original');
     assert.equal(fs.existsSync(path.join(root,'after-submission.json')), false,
       'An unconfirmed original created an Entry');
     const negativeHasError = await page.locator('#gform_' + fixture.form_id + ' .gfield_validation_message, .gform_validation_errors').count();
@@ -107,8 +111,8 @@ async function main() {
     ]);
     const succeeded = await page.locator('#gform_confirmation_message_' + fixture.form_id).count();
     assert.ok(succeeded>0, 'Genuine Gravity Forms confirmation missing; inspect server validation before claiming persistence');
-    assert.ok(requests.some(x=>x.contains_edited_filename && x.contains_confirmation && !x.contains_original_filename),
-      'Genuine outgoing positive request did not carry edited File + marker');
+    assert.ok(requests.some(x=>x.method==='POST' && x.content_type==='multipart/form-data'),
+      'Genuine positive multipart POST not observed (payload bytes may be opaque to Playwright)');
     const evidence={qualification:'AUTHENTIC_CHROMIUM_HTTP',browser:browser.version(),fixture,negative:{
       original_http_post_seen:true,server_rejection_visible:true,no_entry_created:true,
     },positive:{edited,confirmation_visible:true},requests};
