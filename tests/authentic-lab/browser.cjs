@@ -18,6 +18,20 @@ async function main() {
   const browser = await chromium.launch({headless:true, args:['--no-sandbox']});
   const page = await browser.newPage({viewport:{width:1280,height:850}});
   const requests = [];
+  async function captureFrontend(label) {
+    const state = await page.evaluate(() => ({
+      scripts: Array.from(document.scripts).map(x=>x.src).filter(x=>x.includes('gfncr')),
+      editor_count: document.querySelectorAll('.gfncr-editor').length,
+      file_count: document.querySelector('.gfncr-editor')?.closest('.gfield')?.querySelector('input[type="file"]')?.files.length,
+      controls_hidden: document.querySelector('.gfncr-controls')?.hidden,
+      status: document.querySelector('.gfncr-status')?.textContent?.slice(0,180),
+      marker: document.querySelector('.gfncr-editor input[type="hidden"]')?.value,
+      browser_api: {File:typeof File,DataTransfer:typeof DataTransfer,createImageBitmap:typeof createImageBitmap},
+    }));
+    const dest=path.join(root,'positive-frontend.json');
+    fs.writeFileSync(dest,JSON.stringify({phase:label,state},null,2));
+    console.log('REAL_GF_FRONTEND_STATE',label,JSON.stringify(state));
+  }
   page.on('request', (req) => {
     if (req.method() !== 'POST' || !req.url().startsWith('http://127.0.0.1:8080')) return;
     const body = req.postDataBuffer();
@@ -76,16 +90,20 @@ async function main() {
 
     // Fresh form for positive proof; do not call GF API for upload.
     await page.goto(target,{waitUntil:'domcontentloaded'});
+    await captureFrontend('before_file_select');
     await page.locator(inputSelector).setInputFiles(original);
+    await page.waitForTimeout(1250);
+    await captureFrontend('after_file_select');
     await page.waitForFunction(() => {
       const editor=document.querySelector('.gfncr-editor');
       return editor && !editor.querySelector('.gfncr-controls').hidden;
-    });
+    }, null, {timeout:8000});
     assert.equal(await page.locator(inputSelector).evaluate(el=>el.files.length),0,'Unedited original was not removed');
     await page.locator('.gfncr-crop').fill('50');
     await page.locator('.gfncr-rotate').click();
     await page.locator('.gfncr-confirm').click();
-    await page.waitForFunction(() => document.querySelector('.gfncr-editor input[type="hidden"]')?.value === 'confirmed');
+    await captureFrontend('after_confirm_click');
+    await page.waitForFunction(() => document.querySelector('.gfncr-editor input[type="hidden"]')?.value === 'confirmed', null, {timeout:8000});
     const edited = await page.evaluate(async ({formSelector})=>{
       const form = document.querySelector(formSelector);
       const file = new FormData(form).get('input_1');

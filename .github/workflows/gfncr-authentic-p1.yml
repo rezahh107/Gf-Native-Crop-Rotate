@@ -188,6 +188,7 @@ jobs:
           path: |
             /tmp/gfncr-lab-data/identity.json
             /tmp/gfncr-lab-data/negative-preflight.json
+            /tmp/gfncr-lab-data/positive-frontend.json
             /tmp/gfncr-lab-data/fixture.json
             /tmp/gfncr-lab-data/validation.jsonl
             /tmp/gfncr-lab-data/browser.json
