@@ -9,7 +9,7 @@ for tool in php zip unzip diff cmp mktemp; do
 done
 php -r 'if (PHP_VERSION_ID < 80200) { fwrite(STDERR, "PHP 8.2+ required for development checks\n"); exit(1); }'
 
-find . -name '*.php' -type f -not -path './vendor/*' -exec php -l {} \;
+find . -name '*.php' -type f -not -path './vendor/*' -exec sh -c 'for file do php -l "$file" || exit "$?"; done' sh {} +
 php tests/smoke.php
 
 # Until real runtime assets are implemented, fail rather than quietly omit them
