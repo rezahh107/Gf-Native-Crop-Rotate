@@ -1,0 +1,222 @@
+name: GFNCR Authentic P1 Qualification (trusted fixed subject)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/gfncr-authentic-p1.yml'
+      - 'tests/authentic-lab/**'
+  # Deliberately no pull_request_target, workflow_run or public package dispatch.
+
+permissions:
+  contents: read
+
+jobs:
+  authentic-p1:
+    name: WP 6.8.3 / GF 3.1.1.1 / native File -> Entry
+    if: >-
+      github.event.pull_request.head.repo.full_name == 'rezahh107/Gf-Native-Crop-Rotate' &&
+      github.event.pull_request.head.ref == 'lab/authentic-pr2-gf' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    services:
+      database:
+        image: mariadb:11.4.8@sha256:bc474f00629f0123c10f9e1bca193a45d18af15a274cf0656acda64f1086c3b6
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+          MARIADB_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -uroot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      GFNCR_SUBJECT_SHA: '93739dbfa1efc7999bbbd7d063147d3ced3775fe'
+      GFNCR_SOURCE_REPO: 'rezahh107/Gf-Native-Crop-Rotate'
+      GFNCR_GPP_SOURCE_SHA: '34fe6da2bde580869d357ddab82b13fbec6bb846'
+      GFNCR_GF_SHA: '542f56ae0747f3661d1474996527298027db3fb8ed3e6469a6391aaabf61069b'
+      GFNCR_GF_SIZE: '5300290'
+      GFNCR_WP_VERSION: '6.8.3'
+      GFNCR_GF_VERSION: '3.1.1.1'
+      GFNCR_LAB_DIR: /tmp/gfncr-lab-data
+      GFNCR_WP_DIR: /tmp/gfncr-wordpress
+      GFNCR_WP_CLI: /tmp/gfncr-wp-cli.phar
+      GFNCR_PACKAGE: /tmp/gfncr-pr2.zip
+    steps:
+      - name: Checkout trusted same-repository lab
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pinned
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Fail closed on lab identity and source policy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REPOSITORY" = "$GFNCR_SOURCE_REPO"
+          test "$(git rev-parse HEAD)" = '${{ github.event.pull_request.head.sha }}'
+          test -f tests/authentic-lab/browser.cjs
+          ! git ls-files | grep -Ei '(gravityforms.*\.zip|file-upload-pro.*\.zip)'
+          ! grep -R -E '(drive\.usercontent\.google\.com|drive\.google\.com/file)' \
+              tests/authentic-lab .github/workflows/gfncr-authentic-p1.yml
+          mkdir -p "$GFNCR_LAB_DIR" "$GFNCR_WP_DIR"
+          echo "LAB_TRUST_BOUNDARY_PASS no_credential_write=true candidate=$GFNCR_SUBJECT_SHA"
+      - name: Checkout immutable PR 2 product in isolated directory
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rezahh107/Gf-Native-Crop-Rotate
+          ref: 93739dbfa1efc7999bbbd7d063147d3ced3775fe
+          path: subject
+          persist-credentials: false
+      - name: Checkout already-existing Owner-authorized package source (no extra copy in this repo)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rezahh107/Gravity-Presentation-Profiles
+          ref: 34fe6da2bde580869d357ddab82b13fbec6bb846
+          path: existing-package-source
+          sparse-checkout: tests/fixtures/wu21-packages
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Install exact PHP 8.2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.2'
+          coverage: none
+          extensions: mysqli
+      - name: Verify exact inputs and package subject only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$GFNCR_SUBJECT_SHA"
+          test "$(git -C existing-package-source rev-parse HEAD)" = "$GFNCR_GPP_SOURCE_SHA"
+          php -r 'exit( PHP_VERSION_ID >= 80200 && PHP_VERSION_ID < 80300 ? 0 : 1 );'
+          vendor="existing-package-source/tests/fixtures/wu21-packages/gravityforms-3.1.1.1-owner-supplied-source-package.zip"
+          test "$(stat -c '%s' "$vendor")" = "$GFNCR_GF_SIZE"
+          printf '%s  %s\n' "$GFNCR_GF_SHA" "$vendor" | sha256sum -c -
+          unzip -tq "$vendor" >/dev/null
+          sh subject/scripts/verify.sh
+          sh subject/scripts/package.sh "$GFNCR_PACKAGE"
+          unzip -tq "$GFNCR_PACKAGE" >/dev/null
+          unzip -Z1 "$GFNCR_PACKAGE" | LC_ALL=C sort
+          test "$(unzip -p "$GFNCR_PACKAGE" gf-native-crop-rotate/gf-native-crop-rotate.php | sha256sum | cut -d' ' -f1)" = \
+            "$(sha256sum subject/gf-native-crop-rotate.php | cut -d' ' -f1)"
+          for file in tests/authentic-lab/*.php; do php -l "$file"; done
+          node --check tests/authentic-lab/browser.cjs
+          node --check tests/authentic-lab/assert.cjs
+          node --check tests/authentic-lab/ajax.cjs
+          node --check tests/authentic-lab/ajax-assert.cjs
+          python3 -m py_compile tests/authentic-lab/image.py
+          printf '{"subject_sha":"%s","source_repo_sha":"%s","vendor_sha256":"%s","plugin_zip_sha256":"%s","source":"existing_GPP_repository","php":"%s"}\n' \
+            "$GFNCR_SUBJECT_SHA" "$GFNCR_GPP_SOURCE_SHA" "$GFNCR_GF_SHA" \
+            "$(sha256sum "$GFNCR_PACKAGE" | cut -d' ' -f1)" "$(php -r 'echo PHP_VERSION;')" \
+            > "$GFNCR_LAB_DIR/identity.json"
+          echo 'EXACT_INPUTS_VERIFIED'
+      - name: Install real WordPress and operational database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          curl -L --fail --retry 3 -sS -o "$GFNCR_WP_CLI" \
+            https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          printf '%s  %s\n' 'ce34ddd838f7351d6759068d09793f26755463b4a4610a5a5c0a97b68220d85c' "$GFNCR_WP_CLI" | sha256sum -c -
+          php "$GFNCR_WP_CLI" core download --path="$GFNCR_WP_DIR" --version="$GFNCR_WP_VERSION" --force
+          php "$GFNCR_WP_CLI" config create --path="$GFNCR_WP_DIR" --dbname=wordpress --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
+          password="$(openssl rand -hex 24)"
+          php "$GFNCR_WP_CLI" core install --path="$GFNCR_WP_DIR" --url=http://127.0.0.1:8080 \
+            --title='GFNCR Disposable Synthetic Lab' --admin_user=lab_admin \
+            --admin_password="$password" --admin_email=lab@example.invalid --skip-email
+          unset password
+          test "$(php "$GFNCR_WP_CLI" core version --path="$GFNCR_WP_DIR")" = "$GFNCR_WP_VERSION"
+          php "$GFNCR_WP_CLI" option update home http://127.0.0.1:8080 --path="$GFNCR_WP_DIR"
+          php "$GFNCR_WP_CLI" option update siteurl http://127.0.0.1:8080 --path="$GFNCR_WP_DIR"
+          test "$(php "$GFNCR_WP_CLI" option get home --path="$GFNCR_WP_DIR")" = 'http://127.0.0.1:8080'
+          test "$(php "$GFNCR_WP_CLI" option get siteurl --path="$GFNCR_WP_DIR")" = 'http://127.0.0.1:8080'
+          echo 'WORDPRESS_REAL_INSTALL_PASS'
+      - name: Install and activate genuine Gravity Forms and exact candidate artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          vendor="existing-package-source/tests/fixtures/wu21-packages/gravityforms-3.1.1.1-owner-supplied-source-package.zip"
+          unzip -q "$vendor" -d "$GFNCR_WP_DIR/wp-content/plugins/"
+          unzip -q "$GFNCR_PACKAGE" -d "$GFNCR_WP_DIR/wp-content/plugins/"
+          test -f "$GFNCR_WP_DIR/wp-content/plugins/gravityforms/gravityforms.php"
+          grep -q 'Version: 3\.1\.1\.1' "$GFNCR_WP_DIR/wp-content/plugins/gravityforms/gravityforms.php"
+          php "$GFNCR_WP_CLI" plugin activate gravityforms gf-native-crop-rotate --path="$GFNCR_WP_DIR"
+          test "$(php "$GFNCR_WP_CLI" plugin get gravityforms --field=version --path="$GFNCR_WP_DIR")" = "$GFNCR_GF_VERSION"
+          test "$(php "$GFNCR_WP_CLI" plugin get gf-native-crop-rotate --field=version --path="$GFNCR_WP_DIR")" = '0.1.0-dev'
+          mkdir -p "$GFNCR_WP_DIR/wp-content/mu-plugins"
+          cp tests/authentic-lab/observer.php "$GFNCR_WP_DIR/wp-content/mu-plugins/gfncr-ci-observer.php"
+          echo 'EXACT_PLUGINS_ACTIVATED'
+      - name: Create genuine GFAPI form/field opt-in and synthetic PNG
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php "$GFNCR_WP_CLI" --path="$GFNCR_WP_DIR" eval-file "$GITHUB_WORKSPACE/tests/authentic-lab/setup.php" --use-include
+          python3 tests/authentic-lab/image.py "$GFNCR_LAB_DIR/synthetic-original.png"
+          echo "GFNCR_ORIGINAL_SHA256=$(sha256sum "$GFNCR_LAB_DIR/synthetic-original.png" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          test -s "$GFNCR_LAB_DIR/fixture.json"
+      - name: Start actual WordPress HTTP server and browser
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php "$GFNCR_WP_CLI" server --path="$GFNCR_WP_DIR" --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/gfncr-php-server.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/gfncr-php-server.pid"
+          for i in {1..35}; do
+            if curl -sS --max-time 2 -o /dev/null http://127.0.0.1:8080/ ; then break; fi
+            sleep 1
+          done
+          curl --fail -sS -o /dev/null http://127.0.0.1:8080/
+          curl --fail -sS -o /dev/null http://127.0.0.1:8080/wp-content/plugins/gf-native-crop-rotate/assets/js/handoff.js
+          curl --fail -sS -o /dev/null http://127.0.0.1:8080/wp-includes/js/jquery/jquery.min.js
+          npm install --prefix "$RUNNER_TEMP/gfncr-playwright" --no-save --no-audit --no-fund playwright@1.55.0
+          "$RUNNER_TEMP/gfncr-playwright/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/gfncr-playwright/node_modules" >> "$GITHUB_ENV"
+          echo 'REAL_HTTP_AND_CHROMIUM_STARTED'
+      - name: Exercise real native postback and negative original bypass
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node tests/authentic-lab/browser.cjs
+          test -s "$GFNCR_LAB_DIR/browser.json"
+      - name: Read persisted file via real GFAPI and assert exact bytes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php "$GFNCR_WP_CLI" --path="$GFNCR_WP_DIR" eval-file "$GITHUB_WORKSPACE/tests/authentic-lab/readback.php" --use-include
+          node tests/authentic-lab/assert.cjs
+          test -s "$GFNCR_LAB_DIR/assertion.json"
+      - name: Exercise actual GF legacy iframe and modern AJAX from edited native input
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node tests/authentic-lab/ajax.cjs
+          test -s "$GFNCR_LAB_DIR/ajax-iframe.json"
+          test -s "$GFNCR_LAB_DIR/ajax-ajax.json"
+      - name: Verify all three saved native Entries and exact edited bytes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          php "$GFNCR_WP_CLI" --path="$GFNCR_WP_DIR" eval-file "$GITHUB_WORKSPACE/tests/authentic-lab/ajax-readback.php" --use-include
+          node tests/authentic-lab/ajax-assert.cjs
+          test -s "$GFNCR_LAB_DIR/ajax-assertion.json"
+      - name: Upload sanitized evidence only (no vendor package/media)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gfncr-authentic-p1-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            /tmp/gfncr-lab-data/identity.json
+            /tmp/gfncr-lab-data/negative-preflight.json
+            /tmp/gfncr-lab-data/positive-frontend.json
+            /tmp/gfncr-lab-data/fixture.json
+            /tmp/gfncr-lab-data/validation.jsonl
+            /tmp/gfncr-lab-data/browser.json
+            /tmp/gfncr-lab-data/readback.json
+            /tmp/gfncr-lab-data/assertion.json
+            /tmp/gfncr-lab-data/ajax-iframe.json
+            /tmp/gfncr-lab-data/ajax-ajax.json
+            /tmp/gfncr-lab-data/ajax-readback.json
+            /tmp/gfncr-lab-data/ajax-assertion.json
