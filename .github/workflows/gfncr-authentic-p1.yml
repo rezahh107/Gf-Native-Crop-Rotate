@@ -41,10 +41,10 @@ jobs:
       GFNCR_GF_SIZE: '5300290'
       GFNCR_WP_VERSION: '6.8.3'
       GFNCR_GF_VERSION: '3.1.1.1'
-      GFNCR_LAB_DIR: ${{ runner.temp }}/gfncr-lab-data
-      GFNCR_WP_DIR: ${{ runner.temp }}/gfncr-wordpress
-      GFNCR_WP_CLI: ${{ runner.temp }}/gfncr-wp-cli.phar
-      GFNCR_PACKAGE: ${{ runner.temp }}/gfncr-pr2.zip
+      GFNCR_LAB_DIR: /tmp/gfncr-lab-data
+      GFNCR_WP_DIR: /tmp/gfncr-wordpress
+      GFNCR_WP_CLI: /tmp/gfncr-wp-cli.phar
+      GFNCR_PACKAGE: /tmp/gfncr-pr2.zip
     steps:
       - name: Checkout trusted same-repository lab
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pinned
