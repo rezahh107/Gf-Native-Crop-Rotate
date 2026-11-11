@@ -126,6 +126,10 @@ jobs:
             --admin_password="$password" --admin_email=lab@example.invalid --skip-email
           unset password
           test "$(php "$GFNCR_WP_CLI" core version --path="$GFNCR_WP_DIR")" = "$GFNCR_WP_VERSION"
+          php "$GFNCR_WP_CLI" option update home http://127.0.0.1:8080 --path="$GFNCR_WP_DIR"
+          php "$GFNCR_WP_CLI" option update siteurl http://127.0.0.1:8080 --path="$GFNCR_WP_DIR"
+          test "$(php "$GFNCR_WP_CLI" option get home --path="$GFNCR_WP_DIR")" = 'http://127.0.0.1:8080'
+          test "$(php "$GFNCR_WP_CLI" option get siteurl --path="$GFNCR_WP_DIR")" = 'http://127.0.0.1:8080'
           echo 'WORDPRESS_REAL_INSTALL_PASS'
       - name: Install and activate genuine Gravity Forms and exact candidate artifact
         shell: bash
@@ -154,13 +158,15 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          php -S 127.0.0.1:8080 -t "$GFNCR_WP_DIR" > "$RUNNER_TEMP/gfncr-php-server.log" 2>&1 &
+          php "$GFNCR_WP_CLI" server --path="$GFNCR_WP_DIR" --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/gfncr-php-server.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/gfncr-php-server.pid"
           for i in {1..35}; do
             if curl -sS --max-time 2 -o /dev/null http://127.0.0.1:8080/ ; then break; fi
             sleep 1
           done
           curl --fail -sS -o /dev/null http://127.0.0.1:8080/
+          curl --fail -sS -o /dev/null http://127.0.0.1:8080/wp-content/plugins/gf-native-crop-rotate/assets/js/handoff.js
+          curl --fail -sS -o /dev/null http://127.0.0.1:8080/wp-includes/js/jquery/jquery.min.js
           npm install --prefix "$RUNNER_TEMP/gfncr-playwright" --no-save --no-audit --no-fund playwright@1.55.0
           "$RUNNER_TEMP/gfncr-playwright/node_modules/.bin/playwright" install --with-deps chromium
           echo "NODE_PATH=$RUNNER_TEMP/gfncr-playwright/node_modules" >> "$GITHUB_ENV"
