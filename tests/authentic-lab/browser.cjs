@@ -21,12 +21,12 @@ async function main() {
   page.on('request', (req) => {
     if (req.method() !== 'POST' || !req.url().startsWith('http://127.0.0.1:8080')) return;
     const body = req.postDataBuffer();
-    if (!body) return;
     requests.push({
+      body_observable: !!body,
       method:'POST',
-      contains_original_filename: body.includes(Buffer.from('synthetic-original.png')),
-      contains_edited_filename: body.includes(Buffer.from('synthetic-original-edited.png')),
-      contains_confirmation: body.includes(Buffer.from('confirmed')),
+      contains_original_filename: !!body && body.includes(Buffer.from('synthetic-original.png')),
+      contains_edited_filename: !!body && body.includes(Buffer.from('synthetic-original-edited.png')),
+      contains_confirmation: !!body && body.includes(Buffer.from('confirmed')),
       content_type: req.headers()['content-type']?.split(';')[0] || '',
     });
   });
@@ -45,18 +45,26 @@ async function main() {
     // Bypass the client event guards deliberately. Real WordPress/GF must reject original without marker.
     const afterBefore = fs.existsSync(path.join(root,'after-submission.json'));
     assert.equal(afterBefore, false, 'Unexpected submission before negative test');
-    await Promise.all([
+    const [, negativePreflight] = await Promise.all([
       page.waitForNavigation({waitUntil:'domcontentloaded'}),
       page.evaluate(({bytes,sel}) => {
         const input=document.querySelector(sel);
         const transfer=new DataTransfer();
         transfer.items.add(new File([new Uint8Array(bytes)], 'synthetic-original.png', {type:'image/png'}));
         input.files=transfer.files; // no change event: intentionally bypass browser controller
-        HTMLFormElement.prototype.submit.call(input.form);
+        const prepared = new FormData(input.form).get('input_1');
+        const state={input_name:input.files[0]?.name||'',formdata_name:prepared?.name||'',method:input.form.method,enctype:input.form.enctype};
+        setTimeout(()=>HTMLFormElement.prototype.submit.call(input.form),0);
+        return state;
       }, {bytes:Array.from(originalBytes),sel:inputSelector})
     ]);
+    fs.writeFileSync(path.join(root,'negative-preflight.json'),JSON.stringify({form:negativePreflight,requests},null,2));
+    assert.equal(negativePreflight.input_name, 'synthetic-original.png');
+    assert.equal(negativePreflight.formdata_name, 'synthetic-original.png');
+    assert.equal(negativePreflight.method, 'post');
+    assert.equal(negativePreflight.enctype, 'multipart/form-data');
     assert.ok(requests.some(x=>x.contains_original_filename && !x.contains_confirmation),
-      'Negative request did not traverse real HTTP path');
+      'Negative request not observed as uploaded multipart: ' + JSON.stringify(requests));
     assert.equal(fs.existsSync(path.join(root,'after-submission.json')), false,
       'An unconfirmed original created an Entry');
     const negativeHasError = await page.locator('#gform_' + fixture.form_id + ' .gfield_validation_message, .gform_validation_errors').count();
