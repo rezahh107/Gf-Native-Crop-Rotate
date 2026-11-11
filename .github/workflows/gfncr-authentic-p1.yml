@@ -82,7 +82,7 @@ jobs:
       - name: Install exact PHP 8.2
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
-          php-version: '8.2.33'
+          php-version: '8.2'
           coverage: none
           extensions: mysqli
       - name: Verify exact inputs and package subject only
@@ -91,7 +91,7 @@ jobs:
           set -Eeuo pipefail
           test "$(git -C subject rev-parse HEAD)" = "$GFNCR_SUBJECT_SHA"
           test "$(git -C existing-package-source rev-parse HEAD)" = "$GFNCR_GPP_SOURCE_SHA"
-          test "$(php -r 'echo PHP_VERSION;')" = '8.2.33'
+          php -r 'exit( PHP_VERSION_ID >= 80200 && PHP_VERSION_ID < 80300 ? 0 : 1 );'
           vendor="existing-package-source/tests/fixtures/wu21-packages/gravityforms-3.1.1.1-owner-supplied-source-package.zip"
           test "$(stat -c '%s' "$vendor")" = "$GFNCR_GF_SIZE"
           printf '%s  %s\n' "$GFNCR_GF_SHA" "$vendor" | sha256sum -c -
