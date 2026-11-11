@@ -37,11 +37,13 @@ with TemporaryDirectory() as tmp:
                 signature: Array.from(bytes.slice(0, 8)), confirmed:new FormData(form).get('gfncr_confirm_1_1'),
                 optedOut:document.querySelector('#opted-out').files.length };
         }''')
+        assert values['inputIsFile'] is True, values
         assert values['width'] == 100 and values['height'] == 200, values
         assert values['size'] != len(original_bytes), values
         assert values['mime'] == 'image/png' and values['name'] == 'original-edited.png', values
         assert values['confirmed'] == 'confirmed' and values['optedOut'] == 0, values
         assert values['signature'] == [137,80,78,71,13,10,26,10], values
+        assert page.evaluate("document.querySelector('form').dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}))") is True
         print('BROWSER CONFIRM PASS',values)
         page.locator('#input_1_1').set_input_files(str(original))
         page.wait_for_function("!document.querySelector('.gfncr-controls').hidden")
@@ -58,4 +60,27 @@ with TemporaryDirectory() as tmp:
         assert 'Only JPG/PNG' in page.locator('.gfncr-status').inner_text()
         assert page.evaluate("document.querySelector('form').dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}))") is False
         print('BROWSER UNSUPPORTED FORMAT FAIL-CLOSED PASS')
+        second = Path(tmp) / 'second.png'
+        Image.new('RGB', (120, 80), '#a0e050').save(second)
+        page.evaluate("""() => {
+            const real = window.createImageBitmap;
+            let calls = 0;
+            window.createImageBitmap = (file) => {
+                if (++calls === 1) return new Promise((resolve,reject) => setTimeout(() => real(file).then(resolve,reject), 200));
+                return real(file);
+            };
+        }""")
+        page.locator('#input_1_1').set_input_files(str(original))
+        page.locator('#input_1_1').set_input_files(str(second))
+        page.wait_for_function("!document.querySelector('.gfncr-controls').hidden")
+        page.locator('.gfncr-confirm').click()
+        page.wait_for_function("document.querySelector('input[name=gfncr_confirm_1_1]').value === 'confirmed'")
+        page.wait_for_timeout(250)  # let the cancelled first decode complete
+        latest = page.evaluate("""async () => {
+            const file = new FormData(document.querySelector('form')).get('input_1');
+            const bitmap = await createImageBitmap(file);
+            return [bitmap.width,bitmap.height,file.name];
+        }""")
+        assert latest == [90, 60, 'second-edited.png'], latest
+        print('BROWSER STALE ASYNC RESELECTION PASS', latest)
         browser.close()

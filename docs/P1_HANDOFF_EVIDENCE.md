@@ -20,7 +20,7 @@ Fixture source is `tests/browser_check.py`, `tests/browser-fixture.html`; the ou
 - Original generated PNG: **400×200**, **753 bytes**, SHA-256 `2c59c99f8a1b1c1bb2f7a9345742be3b1d732ede30d385a8575ce44d900a89e3`; half image blue, half red.
 - Immediately after native selection, original `input.files.length === 0`. A `submit` event before edit confirmation is cancelled.
 - Set center-crop fraction 50%, rotate 90°, explicitly confirm. Browser `FormData(form).get('input_1')` is `original-edited.png`, `image/png`, **100×200**, **1091 bytes**. PNG signature observed `89 50 4E 47 0D 0A 1A 0A`. Actual edited file has different size and dimensions from original, with the target `input.files[0]` set to the generated edited `File`.
-- Unselected second field was unchanged. Reselection cleared previous marker/File, cancellation left zero files, unsupported text input cleared the native input and blocked a synthetic submit.
+- Unselected second field was unchanged. Reselection cleared previous marker/File, cancellation left zero files, unsupported text input cleared the native input and blocked a synthetic submit. A deliberately delayed first decode followed by immediate reselection preserved only the second selected image (120×80 source → 90×60 edited File). A confirmed edited file allowed a synthetic submit event as a positive control.
 - A browser-side confirmation marker is **not tamper-proof evidence** of a real crop; the PHP callback explicitly relies on GF for normal server-side file validation. The demonstration covers the browser handoff primitive, not GF ownership and persistence.
 
 ## Source/CI checks

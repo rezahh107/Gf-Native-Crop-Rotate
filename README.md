@@ -48,7 +48,7 @@ The remaining decisive native-upload test must show that the edited file survive
 
 ## Packaging, versioning and release controls
 
-The entrypoint header holds the current **development version** (`0.0.1-dev`), with `Update URI` identifying this repository to avoid accidental WordPress.org slug-based updates; it does **not** implement GitHub auto-updates. The ZIP now explicitly packages the PHP bootstrap, JS controller and README with normalized timestamps and atomic output replacement. New assets still require a reviewed allowlist/verification update and authentic installation test. The build intentionally has no auto-tag, release or deploy workflow.
+The entrypoint header holds the current **development version** (`0.1.0-dev`), with `Update URI` identifying this repository to avoid accidental WordPress.org slug-based updates; it does **not** implement GitHub auto-updates. The ZIP now explicitly packages the PHP bootstrap, JS controller and README with normalized timestamps and atomic output replacement. New assets still require a reviewed allowlist/verification update and authentic installation test. The build intentionally has no auto-tag, release or deploy workflow.
 
 **License is not selected.** Public repository visibility does not grant permission to reuse proprietary dependencies or imply a chosen open-source license. The Owner must decide licensing and publication separately. Later release qualification needs reproducible version-to-commit identity, third-party notices for included assets, artifact verification, install/rollback evidence, and explicit authorization for publish/deploy. No production settings or repositories are changed by these scripts.
 
