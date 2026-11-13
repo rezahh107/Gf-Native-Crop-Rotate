@@ -18,7 +18,7 @@
     const cancel = editor.querySelector('.gfncr-cancel');
     const status = editor.querySelector('.gfncr-status');
     if (!input || input.multiple || !marker || !controls || !confirm) return;
-    const state = { generation: 0, source: null, bitmap: null, edited: null, busy: false, failed: false, assigning: false, angle: 0, url: null };
+    const state = { generation: 0, source: null, bitmap: null, edited: null, busy: false, failed: false, assigning: false, angle: 0, url: null, previewTransform: null };
     controllers.set(editor, state);
 
     function message(text) { status.textContent = text; }
@@ -33,6 +33,9 @@
       state.busy = false;
       state.failed = false;
       state.angle = 0;
+      // Restore only our editor rotation, keeping any pre-existing layout transform.
+      if (state.previewTransform !== null) preview.style.transform = state.previewTransform;
+      state.previewTransform = null;
       marker.value = '';
       input.value = ''; // Critical: original file never remains eligible for native submission.
       controls.hidden = true;
@@ -91,11 +94,12 @@
 
     rotate.addEventListener('click', () => {
       if (!state.bitmap || state.busy) return;
+      if (state.previewTransform === null) state.previewTransform = preview.style.transform;
       state.angle = (state.angle + 90) % 360;
-      preview.style.transform = 'rotate(' + state.angle + 'deg)';
+      preview.style.transform = state.previewTransform + (state.previewTransform ? ' ' : '') + 'rotate(' + state.angle + 'deg)';
       message('Rotation ' + state.angle + '°. Confirm to apply.');
     });
-    cancel.addEventListener('click', () => { cleanup(); preview.style.transform = ''; message('Editing cancelled. No image will be uploaded.'); });
+    cancel.addEventListener('click', () => { cleanup(); message('Editing cancelled. No image will be uploaded.'); });
 
     confirm.addEventListener('click', async () => {
       if (state.busy || !state.source || !state.bitmap) return;
